@@ -22,10 +22,12 @@
 			"recommended": true,
 			"suspicious": {
 				"noExplicitAny": "off",
-				"noRedundantUseStrict": "off"
+				"noRedundantUseStrict": "off",
+				"noConfusingVoidType": "off"
 			},
 			"complexity": {
-				"noUselessEmptyExport": "off"
+				"noUselessEmptyExport": "off",
+				"noBannedTypes": "off"
 			},
 			"style": {
 				"noUnusedTemplateLiteral": "off"

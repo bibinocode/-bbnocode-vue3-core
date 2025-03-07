@@ -1,6 +1,12 @@
+import path from 'node:path'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@vue/shared": path.resolve(__dirname, "packages/shared/src")
+    }
+  },
   test: {
     globals: true, // 启用全局变量
     pool: "threads", // 使用线程池

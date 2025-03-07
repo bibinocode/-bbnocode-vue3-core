@@ -87,7 +87,11 @@ importers:
         specifier: workspace:*
         version: link:../shared
 
-  packages/reactivity: {}
+  packages/reactivity:
+    dependencies:
+      '@bbnocode/shared':
+        specifier: workspace:^
+        version: link:../shared
 
   packages/runtime-core:
     dependencies:
