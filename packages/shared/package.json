@@ -1,0 +1,20 @@
+{
+  "name": "@bbnocode/shared",
+  "version": "1.0.0",
+  "description": "共享工具方法",
+  "main": "index.js",
+  "module": "dist/shared.esm-bundler.js",
+  "unpkg": "dist/shared.global.js",
+  "jsdelivr": "dist/shared.global.js",
+  "types": "dist/shared.d.ts",
+  "buildOptions": {
+    "name": "BbnoCodeShared",
+    "formats": [
+      "esm-bundler",
+      "cjs"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

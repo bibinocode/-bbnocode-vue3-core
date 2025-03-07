@@ -1,0 +1,22 @@
+{
+  "name": "@bbnocode/reactivity",
+  "version": "1.0.0",
+  "description": "响应式核心",
+  "main": "index.js",
+  "module": "dist/reactivity.esm-bundler.js",
+  "unpkg": "dist/reactivity.global.js",
+  "jsdelivr": "dist/reactivity.global.js",
+  "types": "dist/reactivity.d.ts",
+  "buildOptions": {
+    "name": "BbnoCodeReactivity",
+    "formats": [
+      "esm-bundler",
+      "esm-browser",
+      "cjs",
+      "global"
+    ]
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
