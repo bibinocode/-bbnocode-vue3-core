@@ -1,9 +1,7 @@
 import { isObject, isSymbol } from '@vue/shared';
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants';
-import { track, trigger } from './dep';
+import { ITERATE_KEY, track, trigger } from './dep';
 import { type Target, reactive } from './reactive';
-
-
 
 
 /**
@@ -70,6 +68,17 @@ class MutableReactiveHandler extends BaseReactiveHandler {
 
     return result
   }
+
+  /**
+   * 处理遍历 for...in 的时候走到 EnumerateObjectProperties 对应内部的 OwnPropertyKeys 方法 也就是 Proxy.ownKeys 方法
+   * 遍历的时候没有指定具体的key, 因此迭代一个对象属性的时候,就需要追踪这个对象的所有属性，因为任何属性的增删都可能影响迭代的结果
+   * 因此使用一个 特殊的 键 来标识 这个effect 依赖对象的所有属性
+   */
+  ownKeys(target: Record<string | symbol, unknown>): (string | symbol)[] {
+    track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
+    return Reflect.ownKeys(track)
+  }
+
 }
 
 /**

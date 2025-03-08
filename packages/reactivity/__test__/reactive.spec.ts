@@ -74,13 +74,12 @@ describe("reactivity/reactive", () => {
       a: 1,
       b: 2,
     };
-
-
     const state = reactive(obj);
-
-    // TODO: 测试 增加属性后 in 是否会触发更新
 
     expect("a" in state).toBe(true);
     expect("c" in state).toBe(false);
+
+    obj.a = 3
+    expect("a" in state).toBe(true);
   });
 });
