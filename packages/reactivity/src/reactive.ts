@@ -1,6 +1,6 @@
 import { isObject } from '@vue/shared'
-import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants'
-import { track, trigger } from './dep'
+import { mutableHandlers } from './baseHandler'
+import { ReactiveFlags } from './constants'
 
 
 
@@ -51,38 +51,9 @@ export function reactive(target: object) {
     return target
   }
 
-  const proxy = new Proxy(target, {
-    get(target, key, receiver) {
-      // 走到 get方法中后，如果访问的是 __isReactive 说明是一个已经代理的proxy
-      if (key === ReactiveFlags.IS_REACTIVE) {
-        return true
-      }
+  const proxy = new Proxy(target, mutableHandlers)
 
-      // 依赖收集
-      track(target, TrackOpTypes.GET, key)
-
-      const result = Reflect.get(target, key, receiver)
-
-      // 4. 如果是对象 递归代理
-      if (isObject(result)) {
-        return reactive(result)
-      }
-
-      return result
-    },
-    set(target, key, value, receiver) {
-      // 触发更新
-      trigger(target, TriggerOpTypes.SET, key)
-      return Reflect.set(target, key, value, receiver)
-    },
-    has(target, key) {
-      track(target, TrackOpTypes.HAS, key)
-      const result = Reflect.has(target, key)
-      return result
-    }
-  })
-
-
+  // 4. 缓存代理对象
   reactiveMap.set(target, proxy)
 
   return proxy

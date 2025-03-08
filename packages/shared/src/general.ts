@@ -16,3 +16,7 @@ export const isPromise = <T = any>(val: unknown): val is Promise<T> => {
   return isObject(val) && isFunction(val.then) && isFunction(val.catch)
 }
 
+
+export const isSymbol = (val: unknown): val is symbol => {
+  return typeof val === 'symbol'
+}
