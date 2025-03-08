@@ -20,3 +20,14 @@ export const isPromise = <T = any>(val: unknown): val is Promise<T> => {
 export const isSymbol = (val: unknown): val is symbol => {
   return typeof val === 'symbol'
 }
+
+//Object.is比较可以避免出现一些特殊情况, 比如NaN和NaN是相等的，+0和-0是不相等的
+export const hasChanged = (val: unknown, old: unknown): boolean => {
+  return !Object.is(val, old)
+}
+
+const hasOwnproperty = Object.prototype.hasOwnProperty
+// 判断对象是否存在某个属性
+export const hasOwn = (val: object, key: string | symbol): key is keyof typeof val => {
+  return hasOwnproperty.call(val, key)
+}

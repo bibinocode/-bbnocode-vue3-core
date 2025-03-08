@@ -1,4 +1,4 @@
-import { isObject, isSymbol } from '@vue/shared';
+import { hasChanged, hasOwn, isObject, isSymbol } from '@vue/shared';
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from './constants';
 import { ITERATE_KEY, track, trigger } from './dep';
 import { type Target, reactive } from './reactive';
@@ -45,12 +45,20 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
  */
 class MutableReactiveHandler extends BaseReactiveHandler {
   set(target: Record<string | symbol, unknown>, key: string, value: unknown, receiver: object): boolean {
-    // 1. 触发更新
-    trigger(target, TriggerOpTypes.SET, key)
+    // 判断是否自身属性
+    const hadKey = hasOwn(target, key)
 
+    const oldValue = target[key]
+
+    // 如果不是自身属性,则就是新增情况
+    if (!hadKey) {
+      trigger(target, TriggerOpTypes.ADD, key)
+    } else if (hasChanged(oldValue, value)) {
+      // 如果新旧值不一样才出发更新,避免不必要的更新
+      trigger(target, TriggerOpTypes.SET, key)
+    }
     // 更新值
     const result = Reflect.set(target, key, value, receiver)
-
     return result
   }
 
@@ -77,6 +85,20 @@ class MutableReactiveHandler extends BaseReactiveHandler {
   ownKeys(target: Record<string | symbol, unknown>): (string | symbol)[] {
     track(target, TrackOpTypes.ITERATE, ITERATE_KEY)
     return Reflect.ownKeys(track)
+  }
+
+
+  /**
+   * 删除属性
+   */
+  deleteProperty(target: Record<string | symbol, unknown>, key: string | symbol): boolean {
+    // 自身有这个属性才可以删
+    const hadKey = hasOwn(target, key)
+    const result = Reflect.deleteProperty(target, key)
+    if (hadKey && result) {
+      trigger(target, TriggerOpTypes.DELETE, key)
+    }
+    return result
   }
 
 }

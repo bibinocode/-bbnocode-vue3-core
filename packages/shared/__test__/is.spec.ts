@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isArray, isFunction, isObject, isPromise, isString } from '../src'
+import { hasChanged, hasOwn, isArray, isFunction, isObject, isPromise, isString, isSymbol } from '../src'
 
 
 describe("test is utils", () => {
@@ -27,6 +27,28 @@ describe("test is utils", () => {
 
   it("is function", () => {
     expect(isFunction(() => { })).toBe(true)
+  })
+
+
+  it("is symbol", () => {
+    expect(isSymbol(Symbol())).toBe(true)
+  })
+
+
+  it("hasChanged", () => {
+    expect(hasChanged(1, 1)).toBe(false)
+    expect(hasChanged(1, 2)).toBe(true)
+    expect(hasChanged(Number.NaN, Number.NaN)).toBe(false)
+    expect(hasChanged(0, -0)).toBe(true)
+  })
+
+  it("hasOwn", () => {
+    const obj = {
+      a: 1,
+      b: 2
+    }
+    expect(hasOwn(obj, "a")).toBe(true)
+    expect(hasOwn(obj, "c")).toBe(false)
   })
 
 })
