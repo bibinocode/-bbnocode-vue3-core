@@ -15,7 +15,7 @@ export interface Target {
  * 存储所有代理过的对象
  * @description 使用 WeakMap 存储代理过的对象，避免内存泄漏
  */
-const reactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>();
+export const reactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>();
 
 declare const ReactiveMarkerSymbol: unique symbol;
 

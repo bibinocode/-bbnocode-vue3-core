@@ -1,7 +1,7 @@
 import { hasChanged, hasOwn, isObject, isSymbol } from "@vue/shared";
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from "./constants";
 import { ITERATE_KEY, track, trigger } from "./dep";
-import { type Target, reactive } from "./reactive";
+import { type Target, reactive, reactiveMap } from "./reactive";
 
 /**
  * 不需要代理的属性集合
@@ -24,9 +24,16 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 			return true;
 		}
 
-		// 2. 处理访问的 ToRaw 的问题
+		// 2. 处理访问的 toRaw方法 的问题
 		if (key === ReactiveFlags.RAW) {
-			return target;
+			// 如果 receiver 是代理对象 或者 检查 receiver 是否与 target 有相同的原型 为了避免用户创建自己的代理Proxy
+			if (
+				receiver === reactiveMap.get(target) ||
+				Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
+			) {
+				return target;
+			}
+			return undefined;
 		}
 
 		// 2. 收集依赖
