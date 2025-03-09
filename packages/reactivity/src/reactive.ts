@@ -28,7 +28,15 @@ export function isReadonly(value: unknown): boolean {
 	return !!(value && (value as Target)[ReactiveFlags.IS_READONLY]);
 }
 
-export function reactive<T extends object>(target: T): Reactive<T>;
+/**
+ * 判断是否是代理对象
+ * @description 判断是否是代理对象 本质上是 递归访问 __v_raw 属性 走到 get 拦截器
+ */
+export function isProxy(value: any): boolean {
+	return value ? !!value[ReactiveFlags.RAW] : false;
+}
+
+export function reactive<T extends object>(target: T): T;
 export function reactive(target: object) {
 	// 1.如果不是对象,直接返回
 	if (!isObject(target)) {
@@ -55,6 +63,18 @@ export function reactive(target: object) {
 	return proxy;
 }
 
+/**
+ * 将值转换为响应式对象
+ * @description 如果值是对象，则将其转换为响应式对象，否则返回值本身
+ */
+export function toReactive<T>(value: T) {
+	return isObject(value) ? reactive(value) : value;
+}
+
+/**
+ * 获取原始对象
+ * @description 获取原始对象 本质上是 递归访问 __v_raw 属性 走到 get 拦截器
+ */
 export function toRaw<T>(observed: T): T {
 	const raw = observed && (observed as Target)[ReactiveFlags.RAW];
 	return (raw ? toRaw(raw) : observed) as T;

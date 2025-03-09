@@ -1,7 +1,8 @@
-import { hasChanged, hasOwn, isObject, isSymbol } from "@vue/shared";
+import { hasChanged, hasOwn, isArray, isObject, isSymbol } from "@vue/shared";
+import { arrayInstrumentations } from "./arrayInstrumentations";
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from "./constants";
 import { ITERATE_KEY, track, trigger } from "./dep";
-import { type Target, reactive, reactiveMap } from "./reactive";
+import { type Target, reactive, reactiveMap, toRaw } from "./reactive";
 
 /**
  * 不需要代理的属性集合
@@ -13,6 +14,22 @@ const builtInSymbols = new Set(
 		.map((key) => Symbol[key as keyof SymbolConstructor])
 		.filter(isSymbol),
 );
+
+/**
+ * 重写对象的 hasOwnProperty 方法 让其可以触发依赖收集
+ * hasOwnProperty 方法 在 对象中 是 自身属性 而不是原型上的属性
+ * hasOwnProperty 的作用是 检查对象是否具有该属性 而不是检查原型上的属性
+ */
+function _hasOwnProperty(this: object, key: unknown) {
+	// 如果key不是Symbol类型 则转换为字符串
+	if (!isSymbol(key)) {
+		key = String(key);
+	}
+	const obj = toRaw(this);
+	track(obj, TrackOpTypes.HAS, key);
+	// 使用 Object.hasOwn 检查对象是否具有该属性
+	return Object.hasOwn(obj, key as PropertyKey);
+}
 
 /**
  * proxy 处理 基础类实现 基础的get方法
@@ -36,7 +53,17 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 			return undefined;
 		}
 
-		// 2. 收集依赖
+		// 3. 如果传入的target 是数组 处理数组的方法重写 和 hasOwnProperty 的特殊情况
+		const targetArray = isArray(target);
+		let fn: Function | undefined;
+		if (targetArray && (fn = arrayInstrumentations[key])) {
+			return fn;
+		}
+		if (key === "hasOwnProperty") {
+			return _hasOwnProperty;
+		}
+
+		// 4. 收集依赖
 		track(target, TrackOpTypes.GET, key);
 
 		const res = Reflect.get(target, key, receiver);

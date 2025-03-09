@@ -23,14 +23,17 @@
 			"suspicious": {
 				"noExplicitAny": "off",
 				"noRedundantUseStrict": "off",
-				"noConfusingVoidType": "off"
+				"noConfusingVoidType": "off",
+				"noAssignInExpressions": "off"
 			},
 			"complexity": {
 				"noUselessEmptyExport": "off",
 				"noBannedTypes": "off"
 			},
 			"style": {
-				"noUnusedTemplateLiteral": "off"
+				"noUnusedTemplateLiteral": "off",
+				"noParameterAssign": "off",
+				"noArguments": "off"
 			}
 		}
 	},
