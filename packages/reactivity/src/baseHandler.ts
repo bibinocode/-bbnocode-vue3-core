@@ -1,4 +1,4 @@
-import { hasChanged, hasOwn, isArray, isObject, isSymbol } from "@vue/shared";
+import { hasChanged, hasOwn, isArray, isObject, isSymbol, makeMap } from "@vue/shared";
 import { arrayInstrumentations } from "./arrayInstrumentations";
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from "./constants";
 import { ITERATE_KEY, track, trigger } from "./dep";
@@ -14,6 +14,10 @@ const builtInSymbols = new Set(
 		.map((key) => Symbol[key as keyof SymbolConstructor])
 		.filter(isSymbol),
 );
+
+const isNonTrackableKeys = makeMap('__proto__')
+
+
 
 /**
  * 重写对象的 hasOwnProperty 方法 让其可以触发依赖收集
@@ -80,6 +84,14 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 			}
 		}
 
+		const res = Reflect.get(target, key, receiver);
+
+		// 处理一些特殊的内置不需要依赖收集的属性 例如 symbol __proto__ 隐式属性 不需要递归处理
+		// 或者一些内置的 Symbol 例如 Symbol.toStringTag 可以改变对象的toString行为 Symbol.iterator 可以改变对象的迭代行为
+		if (isSymbol(key) ? builtInSymbols.has(key) : isNonTrackableKeys(key)) {
+			return res
+		}
+
 		// 4. 收集依赖
 		// track(target, TrackOpTypes.GET, key);
 		// 不是只读的情况下才去收集依赖,节省消耗
@@ -87,13 +99,12 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 			track(target, TrackOpTypes.GET, key);
 		}
 
-		const res = Reflect.get(target, key, receiver);
-
 		// 如果访问的.属性也是对象,则递归代理
 		// v2: 处理 readonly 
 		if (isObject(res)) {
 			return isReadonly ? readonly(res) : reactive(res);
 		}
+
 		return res;
 	}
 }

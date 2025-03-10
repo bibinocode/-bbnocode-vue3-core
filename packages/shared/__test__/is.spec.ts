@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { hasChanged, hasOwn, isArray, isFunction, isObject, isPromise, isString, isSymbol } from '../src'
+import { hasChanged, hasOwn, isArray, isFunction, isObject, isPromise, isString, isSymbol, makeMap } from '../src'
 
 
 describe("test is utils", () => {
@@ -49,6 +49,12 @@ describe("test is utils", () => {
     }
     expect(hasOwn(obj, "a")).toBe(true)
     expect(hasOwn(obj, "c")).toBe(false)
+  })
+
+  it("makeMap", () => {
+    const map = makeMap('a,b,c')
+    expect(map("a")).toBe(true)
+    expect(map("d")).toBe(false)
   })
 
 })
