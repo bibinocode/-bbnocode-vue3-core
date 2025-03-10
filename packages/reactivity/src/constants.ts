@@ -1,6 +1,7 @@
 export enum ReactiveFlags {
 	IS_READONLY = "__isReadonly",
 	IS_REACTIVE = "__isReactive",
+	IS_SHALLOW = '__v_isShallow',
 	RAW = "__v_raw",
 }
 

@@ -1,8 +1,8 @@
-import { hasChanged, hasOwn, isArray, isObject, isSymbol, makeMap } from "@vue/shared";
+import { hasChanged, hasOwn, isArray, isIntegerKey, isObject, isSymbol, makeMap } from "@vue/shared";
 import { arrayInstrumentations } from "./arrayInstrumentations";
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from "./constants";
 import { ITERATE_KEY, track, trigger } from "./dep";
-import { type Target, reactive, reactiveMap, readonly, readonlyMap, toRaw } from "./reactive";
+import { type Target, isReadonly, isShallow, reactive, reactiveMap, readonly, readonlyMap, shallowReactiveMap, toRaw } from "./reactive";
 
 /**
  * 不需要代理的属性集合
@@ -41,14 +41,21 @@ function _hasOwnProperty(this: object, key: unknown) {
 export class BaseReactiveHandler implements ProxyHandler<Target> {
 	constructor(
 		protected readonly _isReadonly: boolean = false, // 是否只读
+		protected readonly _isShallow: boolean = false, // 是否浅层代理
 	) { }
 	get(target: Target, key: string, receiver: ProxyHandler<Target>) {
 
 		const isReadonly = this._isReadonly
+		const isShallow = this._isShallow
 
 		// 1. 处理标识符 如果访问的是 __isReactive 返回 true
 		if (key === ReactiveFlags.IS_REACTIVE) {
 			return true;
+		}
+
+		// v3: 处理访问 __v_isShallow 的情况 isShallow 方法
+		if (key === ReactiveFlags.IS_SHALLOW) {
+			return isShallow
 		}
 
 		// v2: 处理读取readonly, 访问 __isReadonly 的情况
@@ -60,7 +67,8 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 		if (key === ReactiveFlags.RAW) {
 			// 如果 receiver 是代理对象 或者 检查 receiver 是否与 target 有相同的原型 为了避免用户创建自己的代理Proxy
 			// v2: readonly 处理逻辑 取值的weakmap不同 需要做处理
-			const newMap = isReadonly ? readonlyMap : reactiveMap
+			// v3: 浅层代理 取值的weakmap不同 需要做处理
+			const newMap = isReadonly ? readonlyMap : isShallow ? shallowReactiveMap : reactiveMap
 			if (
 				receiver === newMap.get(target) ||
 				Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
@@ -99,6 +107,11 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 			track(target, TrackOpTypes.GET, key);
 		}
 
+		// 如果是浅层代理,直接返回避免递归
+		if (isShallow) {
+			return res
+		}
+
 		// 如果访问的.属性也是对象,则递归代理
 		// v2: 处理 readonly 
 		if (isObject(res)) {
@@ -113,26 +126,44 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
  * 可读可写
  */
 class MutableReactiveHandler extends BaseReactiveHandler {
+	constructor(isShallow = false) {
+		super(false, isShallow)
+	}
 	set(
 		target: Record<string | symbol, unknown>,
 		key: string,
 		value: unknown,
 		receiver: object,
 	): boolean {
-		// 判断是否自身属性
-		const hadKey = hasOwn(target, key);
+		// 获取旧值
+		let oldValue = target[key]
+		// 对非浅层代理的情况进行处理 防止: 无法正确处理嵌套的响应式对象
+		// 1. 浅层代理 导致 旧值 是 只读的 但是 新值 是 响应式的 导致 旧值 和 新值 都是 只读的 导致 无法触发更新
+		// 2. 浅层代理 导致 旧值 是 响应式的 但是 新值 是 只读的 导致 旧值 和 新值 都是 响应式的 导致 无法触发更新
+		// 3. 浅层代理 导致 旧值 是 响应式的 但是 新值 是 响应式的 导致 旧值 和 新值 都是 响应式的 导致 无法触发更新
+		if (!this._isShallow) {
+			// 如果新值不是浅层响应式 并且不是只读的话，就需要去处理拿到原始对象
+			if (!isShallow(value) && !isReadonly(value)) {
+				oldValue = toRaw(oldValue)
+				value = toRaw(value)
+			}
+		}
 
-		const oldValue = target[key];
+		// 检查数组索引是不是已经存在 或者 检查对象属性是不是已经存在
+		const hadKey = isArray(target) && isIntegerKey(key) ? Number(key) < target.length : hasOwn(target, key);
+		// 先设置值，再触发更新
+		const result = Reflect.set(target, key, value, receiver)
 
-		// 如果不是自身属性,则就是新增情况
-		if (!hadKey) {
-			trigger(target, TriggerOpTypes.ADD, key);
-		} else if (hasChanged(oldValue, value)) {
-			// 如果新旧值不一样才出发更新,避免不必要的更新
-			trigger(target, TriggerOpTypes.SET, key);
+		// 首先检查目标是否是原始对象（防止原型链上的操作触发更新）
+		if (target === toRaw(receiver)) {
+			if (!hadKey) {
+				trigger(target, TriggerOpTypes.ADD, key, value)
+			} else if (hasChanged(oldValue, value)) {
+				// 如果新旧值不一样才出发更新,避免不必要的更新
+				trigger(target, TriggerOpTypes.SET, key, value, oldValue)
+			}
 		}
 		// 更新值
-		const result = Reflect.set(target, key, value, receiver);
 		return result;
 	}
 
@@ -211,3 +242,9 @@ export const mutableHandlers: ProxyHandler<object> =
  * 只读代理对象处理
  */
 export const readonlyHandlers: ProxyHandler<object> = new ReadonlyReactiveHandler()
+
+
+/**
+ * 浅层代理对象处理
+ */
+export const shallowReactiveHandlers: ProxyHandler<object> = new MutableReactiveHandler(true)

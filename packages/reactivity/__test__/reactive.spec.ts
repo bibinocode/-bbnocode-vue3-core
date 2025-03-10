@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reactive, readonly, toRaw } from "../src";
+import { isShallow, reactive, readonly, shallowReactive, toRaw } from "../src";
 import { ReactiveFlags } from "../src/constants";
 
 describe("reactivity/reactive", () => {
@@ -136,4 +136,21 @@ describe("reactivity/reactive", () => {
 		readonlyObj.c.d = 4
 		expect(readonlyObj.c.d).toBe(3);
 	});
+
+
+	it("shallowReactive 浅层代理", () => {
+		const obj = {
+			a: 1,
+			b: {
+				c: 2
+			}
+		}
+		const proxy = shallowReactive(obj)
+		// 这里应该只收集了a
+		expect(proxy.a).toBe(1)
+		// 这里应该只收集到b
+		expect(proxy.b.c).toBe(2)
+
+		expect(isShallow(proxy)).toBe(true)
+	})
 });

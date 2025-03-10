@@ -1,5 +1,5 @@
 import { isObject } from "@vue/shared";
-import { mutableHandlers, readonlyHandlers } from "./baseHandler";
+import { mutableHandlers, readonlyHandlers, shallowReactiveHandlers } from "./baseHandler";
 import { ReactiveFlags } from "./constants";
 
 /**
@@ -9,6 +9,7 @@ export interface Target {
 	[ReactiveFlags.IS_READONLY]?: boolean;
 	[ReactiveFlags.IS_REACTIVE]?: boolean;
 	[ReactiveFlags.RAW]?: boolean;
+	[ReactiveFlags.IS_SHALLOW]?: boolean
 }
 
 /**
@@ -21,6 +22,12 @@ export const reactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>();
  * readonly 存储Map
  */
 export const readonlyMap: WeakMap<Target, any> = new WeakMap<Target, any>()
+
+/**
+ * 浅层代理存储Map
+ */
+export const shallowReactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>()
+
 
 declare const ReactiveMarkerSymbol: unique symbol;
 
@@ -44,6 +51,10 @@ export type DeepReadonly<T> = T extends Builtin ?
 	: Readonly<T>
 
 
+export declare const ShallowReactiveMarker: unique symbol
+export type ShallowReactive<T> = T & { [ShallowReactiveMarker]?: true }
+
+
 export function isReadonly(value: unknown): boolean {
 	return !!(value && (value as Target)[ReactiveFlags.IS_READONLY]);
 }
@@ -55,6 +66,15 @@ export function isReadonly(value: unknown): boolean {
 export function isProxy(value: any): boolean {
 	return value ? !!value[ReactiveFlags.RAW] : false;
 }
+
+
+/**
+ * 访问 __v_isShallow 属性判断是否是浅层代理
+ */
+export function isShallow(value: unknown): boolean {
+	return !!(value && (value as Target)[ReactiveFlags.IS_SHALLOW])
+}
+
 
 /**
  * 抽离创建代理对象方法
@@ -119,4 +139,13 @@ export function toRaw<T>(observed: T): T {
  */
 export function readonly<T extends object>(target: T): DeepReadonly<T> {
 	return createReactiveObject(target, true, readonlyHandlers, readonlyMap)
+}
+
+
+/**
+ * 浅层代理
+ */
+
+export function shallowReactive<T extends object>(target: T): ShallowReactive<T> {
+	return createReactiveObject(target, false, shallowReactiveHandlers, shallowReactiveMap)
 }
