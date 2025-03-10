@@ -1,5 +1,5 @@
 import { isObject } from "@vue/shared";
-import { mutableHandlers } from "./baseHandler";
+import { mutableHandlers, readonlyHandlers } from "./baseHandler";
 import { ReactiveFlags } from "./constants";
 
 /**
@@ -59,7 +59,7 @@ export function isProxy(value: any): boolean {
 /**
  * 抽离创建代理对象方法
  */
-export function createReactiveObject(target: Target, isReadonly: boolean, baseHandler: ProxyHandler<any>) {
+export function createReactiveObject(target: Target, isReadonly: boolean, baseHandler: ProxyHandler<any>, proxyMap: WeakMap<Target, any>) {
 	// 1.如果不是对象,直接返回
 	if (!isObject(target)) {
 		console.warn("value not is object");
@@ -68,28 +68,30 @@ export function createReactiveObject(target: Target, isReadonly: boolean, baseHa
 
 
 	//2. 如果已经代理过了,直接返回
-	if (reactiveMap.has(target)) {
-		return reactiveMap.get(target);
+	// 检查代理对象的缓存Map中是否存在目标对象的代理对象，如果存在则直接返回代理对象
+	const exitingProxy = proxyMap.get(target)
+	if (exitingProxy) {
+		return exitingProxy
 	}
 
 	// 3. 如果是proxy代理，无需再次代理：实现方式：去读标识 __isReactive,计算没有这个属性也会走到get方法
 	// 读取 __v_raw（这里是需要处理数组需要访问切换到原始对象的问题）
-	if (target[ReactiveFlags.RAW] && target[ReactiveFlags.IS_REACTIVE]) {
-		console.log("读到了", ReactiveFlags.IS_REACTIVE);
+	// !(isReadonly && target[ReactiveFlags.IS_REACTIVE]) 允许将响应式对象转换为只读对象。这是唯一允许的情况
+	if (target[ReactiveFlags.RAW] && !(isReadonly && target[ReactiveFlags.IS_REACTIVE])) {
 		return target;
 	}
 
-	const proxy = new Proxy(target, mutableHandlers);
+	const proxy = new Proxy(target, baseHandler);
 
 	// 4. 缓存代理对象
-	reactiveMap.set(target, proxy);
+	proxyMap.set(target, proxy);
 	return proxy
 }
 
 
 export function reactive<T extends object>(target: T): T;
 export function reactive(target: object) {
-	return createReactiveObject(target, false, mutableHandlers)
+	return createReactiveObject(target, false, mutableHandlers, reactiveMap)
 }
 
 /**
@@ -116,5 +118,5 @@ export function toRaw<T>(observed: T): T {
  * @description 分开不同的map存储是因为,想通的对象可能有不同的代理因此应该是不同的对象需要分开存储
  */
 export function readonly<T extends object>(target: T): DeepReadonly<T> {
-	return target as any
+	return createReactiveObject(target, true, readonlyHandlers, readonlyMap)
 }

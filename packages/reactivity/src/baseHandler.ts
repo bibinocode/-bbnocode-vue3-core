@@ -2,7 +2,7 @@ import { hasChanged, hasOwn, isArray, isObject, isSymbol } from "@vue/shared";
 import { arrayInstrumentations } from "./arrayInstrumentations";
 import { ReactiveFlags, TrackOpTypes, TriggerOpTypes } from "./constants";
 import { ITERATE_KEY, track, trigger } from "./dep";
-import { type Target, reactive, reactiveMap, toRaw } from "./reactive";
+import { type Target, reactive, reactiveMap, readonly, readonlyMap, toRaw } from "./reactive";
 
 /**
  * 不需要代理的属性集合
@@ -35,17 +35,30 @@ function _hasOwnProperty(this: object, key: unknown) {
  * proxy 处理 基础类实现 基础的get方法
  */
 export class BaseReactiveHandler implements ProxyHandler<Target> {
+	constructor(
+		protected readonly _isReadonly: boolean = false, // 是否只读
+	) { }
 	get(target: Target, key: string, receiver: ProxyHandler<Target>) {
+
+		const isReadonly = this._isReadonly
+
 		// 1. 处理标识符 如果访问的是 __isReactive 返回 true
 		if (key === ReactiveFlags.IS_REACTIVE) {
 			return true;
 		}
 
+		// v2: 处理读取readonly, 访问 __isReadonly 的情况
+		if (key === ReactiveFlags.IS_READONLY) {
+			return isReadonly
+		}
+
 		// 2. 处理访问的 toRaw方法 的问题
 		if (key === ReactiveFlags.RAW) {
 			// 如果 receiver 是代理对象 或者 检查 receiver 是否与 target 有相同的原型 为了避免用户创建自己的代理Proxy
+			// v2: readonly 处理逻辑 取值的weakmap不同 需要做处理
+			const newMap = isReadonly ? readonlyMap : reactiveMap
 			if (
-				receiver === reactiveMap.get(target) ||
+				receiver === newMap.get(target) ||
 				Object.getPrototypeOf(target) === Object.getPrototypeOf(receiver)
 			) {
 				return target;
@@ -54,23 +67,32 @@ export class BaseReactiveHandler implements ProxyHandler<Target> {
 		}
 
 		// 3. 如果传入的target 是数组 处理数组的方法重写 和 hasOwnProperty 的特殊情况
-		const targetArray = isArray(target);
-		let fn: Function | undefined;
-		if (targetArray && (fn = arrayInstrumentations[key])) {
-			return fn;
-		}
-		if (key === "hasOwnProperty") {
-			return _hasOwnProperty;
+		const targetIsArray = isArray(target);
+
+		// v2: 加入readonly 方法后 只有不是只读的情况下,才去重写数组方法收集依赖
+		if (!isReadonly) {
+			let fn: Function | undefined;
+			if (targetIsArray && (fn = arrayInstrumentations[key])) {
+				return fn;
+			}
+			if (key === "hasOwnProperty") {
+				return _hasOwnProperty;
+			}
 		}
 
 		// 4. 收集依赖
-		track(target, TrackOpTypes.GET, key);
+		// track(target, TrackOpTypes.GET, key);
+		// 不是只读的情况下才去收集依赖,节省消耗
+		if (!isReadonly) {
+			track(target, TrackOpTypes.GET, key);
+		}
 
 		const res = Reflect.get(target, key, receiver);
 
 		// 如果访问的.属性也是对象,则递归代理
+		// v2: 处理 readonly 
 		if (isObject(res)) {
-			return reactive(res);
+			return isReadonly ? readonly(res) : reactive(res);
 		}
 		return res;
 	}
@@ -144,8 +166,37 @@ class MutableReactiveHandler extends BaseReactiveHandler {
 	}
 }
 
+
+/**
+ * 只读响应式对象
+ * 读 和 删 都给他返回true 但是不执行操作
+ */
+class ReadonlyReactiveHandler extends BaseReactiveHandler {
+	constructor() {
+		super(true)
+	}
+	set(target: object, key: string | symbol): boolean {
+		console.log(`Set operation failed:${String(key)} is readonly failed: target is.`, target)
+		return true
+	}
+	deleteProperty(target: object, key: string | symbol): boolean {
+		console.log(`Delete operation failed:${String(key)} is readonly failed: target is.`, target)
+		return true
+	}
+}
+
+
+
+
+
 /**
  * 可变代理对象处理
  */
 export const mutableHandlers: ProxyHandler<object> =
 	new MutableReactiveHandler();
+
+
+/**
+ * 只读代理对象处理
+ */
+export const readonlyHandlers: ProxyHandler<object> = new ReadonlyReactiveHandler()

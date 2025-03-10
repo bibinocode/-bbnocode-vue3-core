@@ -106,17 +106,34 @@ describe("reactivity/reactive", () => {
 		const state1 = reactive(arr1);
 
 		state1.push(7);
-	})
+	});
 
 	it("readonly 的实现", () => {
 		const obj = {
 			a: 1,
 			b: 2,
 			c: {
-				d: 3
-			}
-		}
+				d: 3,
+			},
+		};
 
-		const readonlyObj = readonly(obj)
-	})
+		// @ts-ignore
+		// biome-ignore lint/style/useConst: <explanation>
+		let readonlyObj = readonly(obj);
+		// readonly应该不触发依赖收集
+		readonlyObj.a;
+		// 修改属性无效
+		// @ts-ignore
+		readonlyObj.a = 3
+		expect(readonlyObj.a).toBe(1);
+		// 无法删除
+		// @ts-ignore
+		// biome-ignore lint/performance/noDelete: <explanation>
+		delete readonlyObj.a
+		expect(readonlyObj.a).toBe(1);
+		// 嵌套对象也无法修改
+		// @ts-ignore
+		readonlyObj.c.d = 4
+		expect(readonlyObj.c.d).toBe(3);
+	});
 });
