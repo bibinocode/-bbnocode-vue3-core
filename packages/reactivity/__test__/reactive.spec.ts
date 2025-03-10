@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reactive, toRaw } from "../src";
+import { reactive, readonly, toRaw } from "../src";
 import { ReactiveFlags } from "../src/constants";
 
 describe("reactivity/reactive", () => {
@@ -67,7 +67,7 @@ describe("reactivity/reactive", () => {
 		expect(observed.array[0][ReactiveFlags.IS_REACTIVE]).toBe(true);
 	});
 
-	it("访问数组.length 时也应该触发更新", () => {});
+	it("访问数组.length 时也应该触发更新", () => { });
 
 	it("in 关键字检测对象处理", () => {
 		const obj = {
@@ -100,4 +100,23 @@ describe("reactivity/reactive", () => {
 		expect(arr.length).toBe(4);
 		expect(arr[3]).toBe(4);
 	});
+
+	it("push 等方法暂停依赖收集", () => {
+		const arr1 = [1, 2, 3, 4, 5, 6];
+		const state1 = reactive(arr1);
+
+		state1.push(7);
+	})
+
+	it("readonly 的实现", () => {
+		const obj = {
+			a: 1,
+			b: 2,
+			c: {
+				d: 3
+			}
+		}
+
+		const readonlyObj = readonly(obj)
+	})
 });

@@ -12,10 +12,15 @@ export interface Target {
 }
 
 /**
- * 存储所有代理过的对象
+ * 存储所有代理过的响应式对象对象
  * @description 使用 WeakMap 存储代理过的对象，避免内存泄漏
  */
 export const reactiveMap: WeakMap<Target, any> = new WeakMap<Target, any>();
+
+/**
+ * readonly 存储Map
+ */
+export const readonlyMap: WeakMap<Target, any> = new WeakMap<Target, any>()
 
 declare const ReactiveMarkerSymbol: unique symbol;
 
@@ -23,6 +28,21 @@ export type ReactiveMarker = {
 	[ReactiveMarkerSymbol]: void;
 };
 export type Reactive<T extends object> = T extends any[] ? ReactiveMarker : T;
+
+// 递归将各种类型转为只读 就是无限套三元
+type Primitive = string | number | boolean | symbol | null | undefined
+export type Builtin = Primitive | Function | Date | Error | RegExp
+export type DeepReadonly<T> = T extends Builtin ?
+	T : T extends Map<infer K, infer V>
+	? ReadonlyMap<DeepReadonly<K>, DeepReadonly<V>> : T extends WeakMap<infer K, infer V>
+	? WeakMap<DeepReadonly<K>, DeepReadonly<V>> : T extends Set<infer U>
+	? Set<DeepReadonly<U>> : T extends WeakSet<infer U>
+	? WeakSet<DeepReadonly<U>> : T extends ReadonlySet<infer U>
+	? ReadonlySet<DeepReadonly<U>> : T extends Promise<infer U>
+	? Promise<DeepReadonly<U>> : T extends {}
+	? { readonly [P in keyof T]: DeepReadonly<T[P]> }
+	: Readonly<T>
+
 
 export function isReadonly(value: unknown): boolean {
 	return !!(value && (value as Target)[ReactiveFlags.IS_READONLY]);
@@ -36,13 +56,16 @@ export function isProxy(value: any): boolean {
 	return value ? !!value[ReactiveFlags.RAW] : false;
 }
 
-export function reactive<T extends object>(target: T): T;
-export function reactive(target: object) {
+/**
+ * 抽离创建代理对象方法
+ */
+export function createReactiveObject(target: Target, isReadonly: boolean, baseHandler: ProxyHandler<any>) {
 	// 1.如果不是对象,直接返回
 	if (!isObject(target)) {
 		console.warn("value not is object");
 		return target;
 	}
+
 
 	//2. 如果已经代理过了,直接返回
 	if (reactiveMap.has(target)) {
@@ -60,7 +83,13 @@ export function reactive(target: object) {
 
 	// 4. 缓存代理对象
 	reactiveMap.set(target, proxy);
-	return proxy;
+	return proxy
+}
+
+
+export function reactive<T extends object>(target: T): T;
+export function reactive(target: object) {
+	return createReactiveObject(target, false, mutableHandlers)
 }
 
 /**
@@ -78,4 +107,14 @@ export function toReactive<T>(value: T) {
 export function toRaw<T>(observed: T): T {
 	const raw = observed && (observed as Target)[ReactiveFlags.RAW];
 	return (raw ? toRaw(raw) : observed) as T;
+}
+
+
+/**
+ * 将对象转换为只读对象
+ * @description 将对象转换为只读对象
+ * @description 分开不同的map存储是因为,想通的对象可能有不同的代理因此应该是不同的对象需要分开存储
+ */
+export function readonly<T extends object>(target: T): DeepReadonly<T> {
+	return target as any
 }
